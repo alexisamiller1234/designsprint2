@@ -1,0 +1,188 @@
+# read the data
+setwd("/Users/sophiechhourkaplan/Documents/cs463")
+library(ggplot2)
+library(dplyr)
+library(shades)
+data <- read.csv("billionaires_cleaned.csv")
+data <- as.data.frame(data)
+
+#### DOT PLOT ####
+unique(data$company.sector)
+software = data[data$company.sector == "software", ]
+nrow(software)
+s <- software %>%
+  select(c('company.sector', 'wealth.worth')) %>%
+  summarise(total_worth = sum(software$wealth.worth))
+print(s)
+# total_worth 929
+# total_count 168
+
+finance = data[data$company.sector == "finance", ]
+nrow(finance)
+s <- finance %>%
+  select(c('company.sector', 'wealth.worth')) %>%
+  summarise(total_worth = sum(finance$wealth.worth))
+print(s)
+# total_worth 927 
+# total_count 269 
+
+communication = data[data$company.sector == "communication", ]
+nrow(communication)
+s <- communication %>%
+  select(c('company.sector', 'wealth.worth')) %>%
+  summarise(total_worth = sum(communication$wealth.worth))
+print(s)
+# total_worth 783 
+# total_count 193 168, 269, 193
+
+medicals = data[data$company.sector == "medicals", ]
+nrow(medicals)
+s <- medicals %>%
+  select(c('company.sector', 'wealth.worth')) %>%
+  summarise(total_worth = sum(medicals$wealth.worth))
+print(s)
+# total_worth 300 
+# total_count 110 
+
+real = data[data$company.sector == "real estate", ]
+nrow(real)
+s <- real %>%
+  select(c('company.sector', 'wealth.worth')) %>%
+  summarise(total_worth = sum(real$wealth.worth))
+print(s)
+# total_worth 745 
+# total_count 221 
+
+service = data[data$company.sector == "service", ]
+nrow(service)
+s <- service %>%
+  select(c('company.sector', 'wealth.worth')) %>%
+  summarise(total_worth = sum(service$wealth.worth))
+print(s)
+# total_worth 354 
+# total_count 99 
+
+retail = data[data$company.sector == "retail", ]
+nrow(retail)
+ret <- retail %>%
+  select(c('company.sector', 'wealth.worth')) %>%
+  summarise(total_worth = sum(retail$wealth.worth))
+print(ret)  
+# total_worth 648 
+# total_count 152 
+
+raw = data[data$company.sector == "raw materials", ]
+nrow(raw)
+s <- raw %>%
+  select(c('company.sector', 'wealth.worth')) %>%
+  summarise(total_worth = sum(raw$wealth.worth))
+print(s)
+# total_worth 736 
+# total_count 226 
+
+entertainment = data[data$company.sector == "entertainment", ]
+nrow(entertainment)
+s <- entertainment %>%
+  select(c('company.sector', 'wealth.worth')) %>%
+  summarise(total_worth = sum(entertainment$wealth.worth))
+print(s)
+# total_worth 110 
+# total_count 49
+
+#-- create new dataframe --#
+dotdata <- data.frame(sector=c("software", "finance", "communication", "medicals", "real estate", "service", "retail", "raw materials", "entertainment"),
+                      wealth=c(929, 927, 783, 300, 745, 354, 648, 736, 110),
+                      freq=c(168, 269, 193, 110, 221, 99, 152, 226, 49))
+print(dotdata)
+
+ggplot(dotdata, aes(x = wealth, y = freq)) + 
+  geom_point(aes(color = sector), size=5) + 
+  scale_color_brewer(palette  = "Paired") + 
+  geom_text(aes(label=sector), check_overlap = TRUE) + 
+  labs(
+    title ="Comparing Total Wealth and Number of Billionaires Across Industries",
+    x = "Total Wealth", 
+    y = "Number of Billionaires"
+  )
+
+#### TREE MAP ####
+treedata <- data %>% count(wealth.type)
+print(treedata)
+treedata[3,1] <- "founder of non-finance company"
+treedata[6,1] <- "finance"
+g <- ggplot(treedata, aes(area = n, fill = wealth.type, label = paste0(wealth.type, "\n", n))) +
+  geom_treemap() + 
+  geom_treemap_text(colour="black", place="centre")+
+  theme(legend.position = "none")+
+  scale_fill_brewer(palette  = "RdYlGn") +
+  labs(title ="How Billionaires Got Their Wealth")
+print(g)
+
+#### WORLD MAP FAILED ####
+download.file("http://thematicmapping.org/downloads/TM_WORLD_BORDERS_SIMPL-0.3.zip" , destfile="DATA/world_shape_file.zip")
+system("unzip -o world_borders.zip")
+install.packages("rgdal")
+# read shape file with rgdal library
+library(rgdal)
+world_spdf <- readOGR( 
+  dsn= paste0(getwd(),"/world_borders/") , 
+  layer="TM_WORLD_BORDERS_SIMPL-0.3",
+  verbose=FALSE
+)
+# clean the data object
+library(dplyr)
+world_spdf@data$POP2005[ which(world_spdf@data$POP2005 == 0)] = NA
+world_spdf@data$POP2005 <- as.numeric(as.character(world_spdf@data$POP2005)) / 1000000 %>% round(2)
+# now we have spdf object to build maps with
+install.packages("leaflet")
+library(leaflet)
+# clean data
+data$wealth.worth <- as.numeric(data$wealth.worth)
+mapdata <- data %>%
+  group_by(location.region) %>%
+  summarise(total_worth = sum(wealth.worth))
+print(mapdata)  
+# create color palette for map
+library(RColorBrewer)
+mybins <- c(0,50,100,500,1000,2000,Inf)
+mypalette <- colorBin( palette="YlOrBr", domain=mapdata$total_worth, na.color="transparent", bins=mybins)
+# Basic choropleth with leaflet
+m <- leaflet(world_spdf) %>% 
+  addTiles()  %>% 
+  setView( lat=20, lng=0 , zoom=2) %>%
+  addPolygons( fillColor = ~mypalette, stroke=FALSE )
+m
+
+#### TREE MAP FOR COUNTRY REGIONS ####
+#data$wealth.worth <- as.numeric(data$wealth.worth)
+mapdata <- data %>%
+  group_by(location.region) %>%
+  summarise(total_worth = sum(wealth.worth))
+print(mapdata)
+g <- ggplot(mapdata, aes(area = total_worth, fill = location.region, label = paste0(location.region, "\n", total_worth))) +
+  geom_treemap() + 
+  geom_treemap_text(colour="black", place="centre")+
+  theme(legend.position = "none")+
+  scale_fill_brewer(palette  = "RdYlGn") +
+  labs(title ="The Wealth Of Billionaires By Region")
+print(g)
+
+#### Top 10 Billionaires ####
+# correct duplicates
+d <- data %>% 
+  group_by(name) %>%
+  summarise(total_worth = sum(wealth.worth))
+d <- d[order(-d$total_worth),] 
+d <- d[1:10, ]
+d
+g <- ggplot(d, aes(x=reorder(name, total_worth),total_worth))+
+  geom_bar(stat='identity', aes(fill = name))+
+  scale_fill_brewer(palette="Spectral")+
+  coord_flip()+
+  theme(legend.position="none") +
+  labs(
+    y="Wealth in Billions",
+    x="Name",
+    title ="The Wealth of Top 10 Billionaires",
+  )
+g
